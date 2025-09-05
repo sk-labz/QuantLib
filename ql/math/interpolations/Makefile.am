@@ -22,6 +22,7 @@ this_include_HEADERS = \
 	loginterpolation.hpp \
 	mixedinterpolation.hpp \
 	multicubicspline.hpp \
+	rationalinterpolation.hpp \
 	sabrinterpolation.hpp \
 	xabrinterpolation.hpp
 

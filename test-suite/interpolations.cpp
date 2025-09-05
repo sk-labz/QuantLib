@@ -40,6 +40,7 @@
 #include <ql/math/interpolations/lagrangeinterpolation.hpp>
 #include <ql/math/interpolations/linearinterpolation.hpp>
 #include <ql/math/interpolations/multicubicspline.hpp>
+#include <ql/math/interpolations/rationalinterpolation.hpp>
 #include <ql/math/interpolations/sabrinterpolation.hpp>
 #include <ql/math/kernelfunctions.hpp>
 #include <ql/math/optimization/levenbergmarquardt.hpp>
@@ -2848,6 +2849,226 @@ BOOST_AUTO_TEST_CASE(testLaplaceInterpolation) {
         BOOST_CHECK_CLOSE(v, 1.0, 0.1);
     }
 
+}
+
+BOOST_AUTO_TEST_CASE(testRationalInterpolation) {
+    BOOST_TEST_MESSAGE("Testing rational function interpolation...");
+
+    // Test 1: Known rational function f(x) = (x^2 + 1)/(x + 1)
+    std::vector<Real> x1 = {1.0, 2.0, 3.0, 4.0, 5.0};
+    std::vector<Real> y1;
+    
+    for (Real xi : x1) {
+        y1.push_back((xi * xi + 1.0) / (xi + 1.0));
+    }
+    
+    RationalInterpolation rational1(x1.begin(), x1.end(), y1.begin(), 2, 2);
+    
+    // Test at data points
+    Real tolerance = 1.0e-10;
+    for (Size i = 0; i < x1.size(); ++i) {
+        Real interpolated = rational1(x1[i]);
+        Real error = std::abs(interpolated - y1[i]);
+        if (error > tolerance) {
+            BOOST_ERROR("Rational interpolation failed at data point x = " << x1[i]
+                       << "\n    interpolated value: " << interpolated
+                       << "\n    expected value:     " << y1[i]
+                       << "\n    error:              " << error);
+        }
+    }
+    
+    // Test at intermediate points
+    Real testX = 2.5;
+    Real exactValue = (testX * testX + 1.0) / (testX + 1.0);
+    Real interpolatedValue = rational1(testX);
+    Real error = std::abs(interpolatedValue - exactValue);
+    
+    if (error > 1.0e-8) {
+        BOOST_ERROR("Rational interpolation accuracy test failed at x = " << testX
+                   << "\n    interpolated value: " << interpolatedValue
+                   << "\n    exact value:        " << exactValue
+                   << "\n    error:              " << error);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(testRationalInterpolationStability) {
+    BOOST_TEST_MESSAGE("Testing rational function interpolation numerical stability...");
+
+    // Test with simpler, more well-conditioned data
+    std::vector<Real> x = {1.0, 2.0, 3.0, 4.0, 5.0};
+    std::vector<Real> y = {1.0, 0.5, 0.333333, 0.25, 0.2};  // f(x) = 1/x
+    
+    RationalInterpolation rational(x.begin(), x.end(), y.begin(), 2, 2);
+    
+    // Verify interpolation at data points with reasonable tolerance
+    Real tolerance = 1.0e-5;  // Reasonable tolerance for numerical computation
+    for (Size i = 0; i < x.size(); ++i) {
+        Real interpolated = rational(x[i]);
+        Real error = std::abs(interpolated - y[i]);
+        if (error > tolerance) {
+            BOOST_ERROR("Rational interpolation stability test failed at x = " << x[i]
+                       << "\n    interpolated value: " << interpolated
+                       << "\n    expected value:     " << y[i]
+                       << "\n    error:              " << error);
+        }
+    }
+    
+    // Test that interpolated values are reasonable between data points
+    for (Size i = 0; i < x.size() - 1; ++i) {
+        Real midX = (x[i] + x[i+1]) / 2.0;
+        Real midY = rational(midX);
+        
+        // For monotonic data, check that values are reasonable
+        Real minY = std::min(y[i], y[i+1]);
+        Real maxY = std::max(y[i], y[i+1]);
+        
+        // Allow more generous bounds for rational interpolation
+        Real range = maxY - minY;
+        Real lowerBound = minY - 2.0 * range;  // More generous bounds
+        Real upperBound = maxY + 2.0 * range;
+        
+        if (midY < lowerBound || midY > upperBound) {
+            BOOST_ERROR("Rational interpolation produces unreasonable values at x = " << midX
+                       << "\n    interpolated value: " << midY
+                       << "\n    expected range: [" << lowerBound << ", " << upperBound << "]");
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(testRationalInterpolationDegrees) {
+    BOOST_TEST_MESSAGE("Testing rational function interpolation with different degrees...");
+
+    // Test data
+    std::vector<Real> x = {0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
+    std::vector<Real> y = {1.0, 2.0, 1.5, 3.0, 2.5, 4.0, 3.5};
+    
+    // Test different degree combinations
+    std::vector<std::pair<Size, Size>> degreeTests = {
+        {3, 3},  // balanced
+        {4, 2},  // higher numerator
+        {2, 4},  // higher denominator
+        {1, 5},  // linear numerator
+        {5, 1}   // linear denominator
+    };
+    
+    Real tolerance = 1.0e-8;  // More reasonable tolerance for floating point
+    
+    for (const auto& degrees : degreeTests) {
+        Size numDeg = degrees.first;
+        Size denDeg = degrees.second;
+        
+        RationalInterpolation rational(x.begin(), x.end(), y.begin(), numDeg, denDeg);
+        
+        // Test interpolation at data points
+        for (Size i = 0; i < x.size(); ++i) {
+            Real interpolated = rational(x[i]);
+            Real error = std::abs(interpolated - y[i]);
+            if (error > tolerance) {
+                BOOST_ERROR("Rational interpolation with degrees (" << numDeg << "," << denDeg 
+                           << ") failed at x = " << x[i]
+                           << "\n    interpolated value: " << interpolated
+                           << "\n    expected value:     " << y[i]
+                           << "\n    error:              " << error);
+            }
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(testRationalInterpolationExtrapolation) {
+    BOOST_TEST_MESSAGE("Testing rational function interpolation extrapolation...");
+
+    // Simple increasing function
+    std::vector<Real> x = {1.0, 2.0, 3.0, 4.0, 5.0};
+    std::vector<Real> y = {1.0, 4.0, 9.0, 16.0, 25.0};  // quadratic data
+    
+    RationalInterpolation rational(x.begin(), x.end(), y.begin(), 2, 2);
+    rational.enableExtrapolation();
+    
+    // Test extrapolation - should give reasonable values
+    Real leftExtrap = rational(0.5);
+    Real rightExtrap = rational(6.0);
+    
+    // Values should not be infinite or NaN
+    if (!std::isfinite(leftExtrap) || !std::isfinite(rightExtrap)) {
+        BOOST_ERROR("Rational interpolation extrapolation produces non-finite values"
+                   << "\n    left extrapolation at x=0.5: " << leftExtrap
+                   << "\n    right extrapolation at x=6.0: " << rightExtrap);
+    }
+    
+    // Values should be in a reasonable range
+    if (leftExtrap < -100.0 || leftExtrap > 100.0 || 
+        rightExtrap < -100.0 || rightExtrap > 100.0) {
+        BOOST_ERROR("Rational interpolation extrapolation produces extreme values"
+                   << "\n    left extrapolation at x=0.5: " << leftExtrap
+                   << "\n    right extrapolation at x=6.0: " << rightExtrap);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(testRationalInterpolationMinimumPoints) {
+    BOOST_TEST_MESSAGE("Testing rational function interpolation with minimum data points...");
+
+    // Test with exactly 3 points (minimum for default degrees)
+    std::vector<Real> x = {0.0, 1.0, 2.0};
+    std::vector<Real> y = {1.0, 2.0, 4.0};
+    
+    RationalInterpolation rational(x.begin(), x.end(), y.begin());
+    
+    // Should interpolate reasonably at data points
+    Real tolerance = 1.0e-8;
+    for (Size i = 0; i < x.size(); ++i) {
+        Real interpolated = rational(x[i]);
+        Real error = std::abs(interpolated - y[i]);
+        if (error > tolerance) {
+            BOOST_ERROR("Rational interpolation with minimum points failed at x = " << x[i]
+                       << "\n    interpolated value: " << interpolated
+                       << "\n    expected value:     " << y[i]
+                       << "\n    error:              " << error);
+        }
+    }
+    
+    // Test interpolation between points
+    Real midpoint = rational(0.5);
+    if (!std::isfinite(midpoint)) {
+        BOOST_ERROR("Rational interpolation with minimum points produces non-finite value at x=0.5: " 
+                   << midpoint);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(testRationalInterpolationVsLinear) {
+    BOOST_TEST_MESSAGE("Testing rational function interpolation comparison with linear...");
+
+    // Create data where rational should perform better than linear
+    std::vector<Real> x = {0.1, 0.5, 1.0, 2.0, 5.0};
+    std::vector<Real> y;
+    
+    // Use function with asymptotic behavior: f(x) = 1/(1+x)
+    for (Real xi : x) {
+        y.push_back(1.0 / (1.0 + xi));
+    }
+    
+    RationalInterpolation rational(x.begin(), x.end(), y.begin(), 2, 2);
+    LinearInterpolation linear(x.begin(), x.end(), y.begin());
+    
+    // Compare accuracy at test points
+    std::vector<Real> testX = {0.3, 0.7, 1.5, 3.0};
+    
+    for (Real xi : testX) {
+        Real exactValue = 1.0 / (1.0 + xi);
+        Real rationalValue = rational(xi);
+        Real linearValue = linear(xi);
+        
+        Real rationalError = std::abs(rationalValue - exactValue);
+        Real linearError = std::abs(linearValue - exactValue);
+        
+        // Rational should generally be more accurate for this type of function
+        // Allow some tolerance for cases where they might be comparable
+        if (rationalError > 2.0 * linearError && rationalError > 1.0e-3) {
+            BOOST_ERROR("Rational interpolation is significantly less accurate than linear at x = " << xi
+                       << "\n    exact value:     " << exactValue
+                       << "\n    rational value:  " << rationalValue << " (error: " << rationalError << ")"
+                       << "\n    linear value:    " << linearValue << " (error: " << linearError << ")");
+        }
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

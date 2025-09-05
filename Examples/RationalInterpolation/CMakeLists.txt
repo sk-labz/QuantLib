@@ -1,0 +1,2 @@
+add_executable(RationalInterpolation RationalInterpolation.cpp)
+target_link_libraries(RationalInterpolation ql_library)

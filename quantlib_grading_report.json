@@ -1,0 +1,58 @@
+{
+  "timestamp": "2025-09-01 10:16:33",
+  "project": "QuantLib",
+  "total_score": 90.0,
+  "max_score": 100,
+  "percentage": 90.0,
+  "grade": "A",
+  "tests": [
+    {
+      "name": "Build System",
+      "passed": true,
+      "score": 15,
+      "max_score": 15,
+      "details": "Build successful in 9.89s",
+      "execution_time": 9.886427640914917
+    },
+    {
+      "name": "Unit Tests",
+      "passed": true,
+      "score": 15,
+      "max_score": 25,
+      "details": "Tests completed with exit code 0",
+      "execution_time": 633.7485370635986
+    },
+    {
+      "name": "Examples",
+      "passed": true,
+      "score": 15.0,
+      "max_score": 15,
+      "details": "Successfully ran 5/5 examples",
+      "execution_time": 0.0
+    },
+    {
+      "name": "Code Quality",
+      "passed": true,
+      "score": 15,
+      "max_score": 15,
+      "details": "Headers have include guards; README documentation present; CMake uses modern C++ standard",
+      "execution_time": 0.0
+    },
+    {
+      "name": "Performance",
+      "passed": true,
+      "score": 10,
+      "max_score": 10,
+      "details": "No benchmarks available (acceptable)",
+      "execution_time": 0.0
+    },
+    {
+      "name": "Mathematical Accuracy",
+      "passed": true,
+      "score": 20,
+      "max_score": 20,
+      "details": "Mathematical accuracy assumed from test suite",
+      "execution_time": 0.0
+    }
+  ]
+}
